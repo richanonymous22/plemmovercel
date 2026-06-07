@@ -187,9 +187,9 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // 7.6 Section Transitions (Micro-animations)
   gsap.utils.toArray('section').forEach(sec => {
-    // Skip the horizontal scroll and showcase sections to avoid breaking their specialized layouts/fixed elements
-    if(sec.classList.contains('sleek-gallery-section') || sec.classList.contains('horizontal-scroll-section') || sec.classList.contains('showcase-section')) return;
-    
+    // Skip sections with specialised scroll behaviour — transforms on parents break position:sticky
+    if(sec.classList.contains('sleek-gallery-section') || sec.classList.contains('horizontal-scroll-section') || sec.classList.contains('showcase-section') || sec.classList.contains('sticky-scroll-section')) return;
+
     gsap.from(sec, {
       opacity: 0,
       y: 30,
@@ -199,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
       scrollTrigger: {
         trigger: sec,
         start: "top 85%",
-        toggleActions: "play none none reverse"
+        toggleActions: "play none none none"
       }
     });
   });
@@ -300,11 +300,38 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // 9. Apple-Style Sticky Scroll Image Swap
+  // 9. Apple-Style Sticky Scroll: GSAP-pin the image column, swap images as text scrolls
   const stickySteps = document.querySelectorAll('.sticky-step');
   const stickyImages = document.querySelectorAll('.sticky-image');
-  
-  if (stickySteps.length > 0 && window.innerWidth > 768) {
+  const stickyVisual = document.querySelector('.sticky-visual-col');
+  const stickyTextCol = document.querySelector('.sticky-text-col');
+
+  function activateImage(index) {
+    stickyImages.forEach(img => img.classList.remove('active'));
+    stickySteps.forEach(s => s.classList.remove('active'));
+    if (stickyImages[index]) stickyImages[index].classList.add('active');
+    if (stickySteps[index]) stickySteps[index].classList.add('active');
+  }
+
+  if (stickySteps.length > 0) {
+    // Show the first image immediately
+    activateImage(0);
+
+    // Pin the image column in the viewport while the text column scrolls past it.
+    // Uses GSAP pinning (not CSS position:sticky) so it is immune to ancestor
+    // overflow/transform contexts elsewhere on the page.
+    if (stickyVisual && stickyTextCol && window.innerWidth > 768) {
+      ScrollTrigger.create({
+        trigger: stickyVisual,
+        start: "top 15%",
+        endTrigger: stickyTextCol,
+        end: "bottom 85%",
+        pin: stickyVisual,
+        pinSpacing: false
+      });
+    }
+
+    // Cross-fade to the matching image as each text block reaches the centre
     stickySteps.forEach((step, index) => {
       ScrollTrigger.create({
         trigger: step,
@@ -314,14 +341,6 @@ document.addEventListener('DOMContentLoaded', () => {
         onEnterBack: () => activateImage(index)
       });
     });
-    
-    function activateImage(index) {
-      stickyImages.forEach(img => img.classList.remove('active'));
-      stickySteps.forEach(s => s.classList.remove('active'));
-      
-      stickyImages[index].classList.add('active');
-      stickySteps[index].classList.add('active');
-    }
   }
 
   // 10. Testimonials Infinite Marquee
@@ -479,11 +498,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // 13. Hover Image Reveal Showcase
   const hoverItems = document.querySelectorAll('.hover-item');
   const revealImg = document.querySelector('.hover-reveal-img');
-  
+
   if(hoverItems.length > 0 && revealImg && window.innerWidth > 1024) {
     let mouseX = 0, mouseY = 0, revealX = 0, revealY = 0;
     let isHovering = false;
-    
+
     window.addEventListener('mousemove', (e) => {
       mouseX = e.clientX;
       mouseY = e.clientY;
@@ -492,12 +511,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const animateReveal = () => {
       revealX += (mouseX - revealX) * 0.12;
       revealY += (mouseY - revealY) * 0.12;
-      
+
       if(isHovering) {
-        gsap.set(revealImg, { 
-          x: revealX - 200, 
-          y: revealY - 150, 
-          rotation: (mouseX - revealX) * 0.05 
+        gsap.set(revealImg, {
+          x: revealX - 200,
+          y: revealY - 150,
+          rotation: (mouseX - revealX) * 0.05
         });
       }
       requestAnimationFrame(animateReveal);
@@ -517,5 +536,8 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
+
+  // Recalculate all ScrollTrigger positions after images/fonts have loaded
+  window.addEventListener('load', () => ScrollTrigger.refresh());
 
 });
